@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MBTI 性格测试 - AI 智能分析</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+        .content { padding: 30px; }
+        .question {
+            display: none;
+            margin-bottom: 30px;
+        }
+        .question.active { display: block; }
+        .question h3 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .options { display: flex; flex-direction: column; gap: 12px; }
+        .option {
+            padding: 15px 20px;
+            border: 2px solid #eee;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 15px;
+            color: #555;
+        }
+        .option:hover {
+            border-color: #f5576c;
+            background: #fff5f6;
+        }
+        .option.selected {
+            border-color: #f5576c;
+            background: #f5576c;
+            color: white;
+        }
+        .progress-bar {
+            height: 6px;
+            background: #eee;
+            border-radius: 3px;
+            margin-bottom: 30px;
+        }
+        .progress {
+            height: 100%;
+            background: linear-gradient(90deg, #f093fb, #f5576c);
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        .btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .result {
+            display: none;
+            text-align: center;
+        }
+        .result.active { display: block; }
+        .mbti-type {
+            font-size: 64px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 10px 0;
+        }
+        .mbti-name { font-size: 22px; color: #333; margin-bottom: 15px; }
+        .mbti-desc {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.8;
+            color: #666;
+        }
+        .tips {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff5f6;
+            border-radius: 10px;
+            font-size: 13px;
+            color: #f5576c;
+        }
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #eee;
+            border-top-color: #f5576c;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔮 MBTI 性格测试</h1>
+            <p>8道题揭示你的性格密码</p>
+        </div>
+        <div class="content" id="quiz">
+            <div class="progress-bar"><div class="progress" id="progress"></div></div>
+            <div id="questions"></div>
+            <button class="btn" id="nextBtn" onclick="nextQuestion()">下一题</button>
+        </div>
+        <div class="content" id="loading" style="display:none;">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>AI 正在分析你的性格...</p>
+            </div>
+        </div>
+        <div class="content result" id="result">
+            <div class="mbti-type" id="mbtiType">INTJ</div>
+            <div class="mbti-name" id="mbtiName">建筑师</div>
+            <div class="mbti-desc" id="mbtiDesc"></div>
+            <div class="tips" id="tips"></div>
+            <button class="btn" onclick="location.reload()" style="margin-top:20px;">再测一次</button>
+        </div>
+    </div>
+
+    <script>
+        // 16种MBTI详细数据
+        const mbtiData = {
+            'INTJ': { name: '建筑师', desc: '你是一个独立思考者，有着清晰的逻辑和远见。你善于制定长期计划，执行力强，喜欢独自工作或思考。', tips: '💼 适合职业：战略规划、技术开发、咨询顾问、科学家' },
+            'INTP': { name: '逻辑学家', desc: '你热爱分析问题，追求理论完整。你善于发现问题本质，喜欢研究和解决复杂问题。', tips: '💼 适合职业：科研、技术研发、数据分析、哲学' },
+            'ENTJ': { name: '指挥官', desc: '你天生具有领导能力，果断决策，敢于承担责任。你善于激励团队达成目标。', tips: '💼 适合职业：企业管理、创业、法律、投资' },
+            'ENTP': { name: '辩论家', desc: '你思维活跃，喜欢挑战和创新，善于发现问题的不同视角。喜欢讨论和辩论。', tips: '💼 适合职业：咨询、市场营销、媒体、发明家' },
+            'INFJ': { name: '提倡者', desc: '你富有理想主义，关注他人成长，有强烈的同理心。你善于理解他人需求。', tips: '💼 适合职业：心理咨询、教育、文化艺术、公益' },
+            'INFP': { name: '调停者', desc: '你内心温暖，追求意义和价值，有着丰富的内心世界。你善于发现美好。', tips: '💼 适合职业：写作、艺术创作、心理咨询、翻译' },
+            'ENFJ': { name: '主人公', desc: '你天生具有领袖魅力，善于激励他人，关注团队成长。你善于帮助他人发挥潜力。', tips: '💼 适合职业：人力资源、培训、教育管理、演员' },
+            'ENFP': { name: '竞选者', desc: '你热情洋溢，充满创意和灵感，善于激发团队热情。你喜欢自由和可能性。', tips: '💼 适合职业：市场营销、广告创意、公关、导游' },
+            'ISTJ': { name: '物流师', desc: '你稳重可靠，注重细节和规则，善于确保任务准确完成。你重视责任和承诺。', tips: '💼 适合职业：财务、审计、行政管理、军事' },
+            'ISFJ': { name: '守卫者', desc: '你细心体贴，关注他人需求，默默付出。你善于照顾他人，非常忠诚。', tips: '💼 适合职业：护理、教育、服务业、秘书' },
+            'ESTJ': { name: '总经理', desc: '你组织能力强，注重效率和结果，善于建立秩序。你喜欢管理和领导。', tips: '💼 适合职业：项目管理、物流、企业运营、警察' },
+            'ESFJ': { name: '执政官', desc: '你热情友好，重视人际关系，善于创造和谐氛围。你喜欢帮助他人。', tips: '💼 适合职业：人力资源、服务业、销售、护理' },
+            'ISTP': { name: '鉴赏家', desc: '你动手能力强，喜欢研究原理，善于解决实际问题。你冷静观察，灵活应变。', tips: '💼 适合职业：技术工程、机械制造、运动员、厨师' },
+            'ISFP': { name: '探险家', desc: '你审美敏锐，追求内心平静，善于发现美。你温柔内敛，享受当下。', tips: '💼 适合职业：艺术设计、手工艺、烹饪、园艺' },
+            'ESTP': { name: '企业家', desc: '你行动力强，善于把握机会，喜欢冒险和挑战。你灵活务实，享受竞争。', tips: '💼 适合职业：销售、商务谈判、创业、消防员' },
+            'ESFP': { name: '表演者', desc: '你热情奔放，享受当下，善于活跃气氛。你喜欢表达和表演。', tips: '💼 适合职业：表演、餐饮、娱乐行业、摄影' }
+        };
+
+        const questions = [
+            { q: "社交聚会中，你通常？", a: ["认识新朋友，获取能量", "和熟悉的朋友聊天，回避陌生人"] },
+            { q: "你更喜欢？", a: ["实用的想法和创新", "富有想象力和创意"] },
+            { q: "做决定时，你更看重？", a: ["逻辑和客观分析", "他人感受和价值观"] },
+            { q: "你更倾向于？", a: ["按照计划行事", "随机应变，保持灵活"] },
+            { q: "工作中你喜欢？", a: ["独立完成，专注思考", "团队协作，频繁交流"] },
+            { q: "面对问题，你习惯？", a: ["先分析再行动", "先行动边想边做"] },
+            { q: "你更容易被什么吸引？", a: ["事实和数据", "可能性和灵感"] },
+            { q: "空闲时间你更愿意？", a: ["阅读、学习新技能", "放松、享受当下"] }
+        ];
+
+        let current = 0;
+        let answers = [];
+
+        function init() {
+            const container = document.getElementById('questions');
+            questions.forEach((q, i) => {
+                const div = document.createElement('div');
+                div.className = 'question' + (i === 0 ? ' active' : '');
+                div.innerHTML = `<h3>${i+1}. ${q.q}</h3><div class="options"><div class="option" onclick="selectOption(${i}, 0, this)">A. ${q.a[0]}</div><div class="option" onclick="selectOption(${i}, 1, this)">B. ${q.a[1]}</div></div>`;
+                container.appendChild(div);
+            });
+            updateProgress();
+        }
+
+        function selectOption(qi, value, el) {
+            answers[qi] = value;
+            document.querySelectorAll('.question')[qi].querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        function nextQuestion() {
+            if (answers[current] === undefined) {
+                alert('请选择一个选项');
+                return;
+            }
+            if (current < questions.length - 1) {
+                document.querySelectorAll('.question')[current].classList.remove('active');
+                current++;
+                document.querySelectorAll('.question')[current].classList.add('active');
+                updateProgress();
+                document.getElementById('nextBtn').textContent = current === questions.length - 1 ? '查看结果' : '下一题';
+            } else {
+                showResult();
+            }
+        }
+
+        function updateProgress() {
+            document.getElementById('progress').style.width = ((current + 1) / questions.length * 100) + '%';
+        }
+
+        function showResult() {
+            document.getElementById('quiz').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+
+            setTimeout(() => {
+                // 计算 MBTI 类型
+                const types = ['EI', 'SN', 'TF', 'JP'];
+                let mbti = '';
+                for (let i = 0; i < 4; i++) {
+                    let score = (answers[i*2] || 0) + (answers[i*2+1] || 0);
+                    mbti += score >= 1 ? types[i][1] : types[i][0];
+                }
+
+                const result = mbtiData[mbti] || { name: mbti, desc: '你是一个独特的性格，继续探索自己吧！', tips: '' };
+
+                document.getElementById('mbtiType').textContent = mbti;
+                document.getElementById('mbtiName').textContent = result.name;
+                document.getElementById('mbtiDesc').textContent = result.desc;
+                document.getElementById('tips').textContent = result.tips || '';
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('result').classList.add('active');
+            }, 1500);
+        }
+
+        init();
+    </script>
+</body>
+</html>
